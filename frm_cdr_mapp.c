@@ -3834,10 +3834,10 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
 #endif
 
     if ( glb_UseRatedCdr == 1 ) {
-        if ( iCategories & CAT_IDD || iCategories & CAT_MARITIME || iCategories & CAT_VAS ) {
+        if ( (iCategories & CAT_VOICE || iCategories & CAT_VAS) && iCategories & CAT_LOCAL ) {
             fprintf(glb_Errfp, "[DET] %s|Rating|Use_RBM|\n", glb_Eindex);
             glb_ErrCtr++;
-            return FAILURE; // if RBM cdr is used, only voice local from other cdr type is rejected.
+            return FAILURE; // if RBM cdr is used, only voice local or voice vas from other cdr type is rejected.
         }
     }
 
@@ -10540,10 +10540,10 @@ printf ("\t Bno=%-30s => %s\n", pbuf_ims[IMS_BNO], voice_event.to_number);
     }
 
     if ( glb_UseRatedCdr == 1 ) {
-        if ( iCategories & CAT_IDD || iCategories & CAT_MARITIME || iCategories & CAT_VAS ) {
+        if ( (iCategories & CAT_VOICE || iCategories & CAT_VAS) && iCategories & CAT_LOCAL ) {
             fprintf(glb_Errfp, "[DET] %s|Rating|Use_RBM|\n", glb_Eindex);
             glb_ErrCtr++;
-            return FAILURE; // if RBM cdr is used, only voice local from other cdr type is rejected.
+            return FAILURE; // if RBM cdr is used, only voice local or voice vas from other cdr type is rejected.
         }
     }
 
@@ -11383,10 +11383,10 @@ printf ("\t Bno=%-30s => %s\n", pbuf_rdc[RDC_CALLED_B_NO], voice_event.to_number
     }
 
     if ( glb_UseRatedCdr == 1 ) {
-        if ( iCategories & CAT_IDD || iCategories & CAT_MARITIME || iCategories & CAT_VAS ) {
+        if ( (iCategories & CAT_VOICE || iCategories & CAT_VAS) && iCategories & CAT_LOCAL ) {
             fprintf(glb_Errfp, "[DET] %s|Rating|Use_RBM|\n", glb_Eindex);
             glb_ErrCtr++;
-            return FAILURE; // if RBM cdr is used, only voice local from other cdr type is rejected.
+            return FAILURE; // if RBM cdr is used, only voice local or voice vas from other cdr type is rejected.
         }
     }
 
@@ -23350,14 +23350,17 @@ void Conv_RealBno(const char *in_bno, char *out_bno)
     strcpy(out_bno, in_bno);
 
     if ( !strncmp(in_bno, "00", 2) ) {
-        if ( !strncmp(in_bno+3, "00", 2) ) {    // input = 00X00nnnnnnnnn.. then output -> 0nnnnnnnnn..
-            strcpy(out_bno, in_bno+4);
+        if ( !strncmp(in_bno+3, "00", 2) ) {
+            //strcpy(out_bno, in_bno+4);              // input = 00X00nnnnnnnnn.. then output -> 0nnnnnnnnn..
+            strcpy(out_bno, in_bno+5);              // input = 00X00nnnnnnnnn.. then output -> nnnnnnnnn..
         }
-        else if ( *(in_bno+3) == '0' ) {        // input = 00X0nnnnnnnnn.. then output -> 0nnnnnnnnn..
-            strcpy(out_bno, in_bno+3);
+        else if ( *(in_bno+3) == '0' ) {
+            //strcpy(out_bno, in_bno+3);              // input = 00X0nnnnnnnnn.. then output -> 0nnnnnnnnn..
+            strcpy(out_bno, in_bno+4);              // input = 00X0nnnnnnnnn.. then output -> nnnnnnnnn.
         }
-        else {  // input = 00Xnnnnnnnnn.. then output -> 0nnnnnnnnnn..
-            sprintf(out_bno, "0%s", in_bno+3);
+        else {
+            //sprintf(out_bno, "0%s", in_bno+3);      // input = 00Xnnnnnnnnn.. then output -> 0nnnnnnnnnn..
+            strcpy(out_bno, in_bno+3);      // input = 00Xnnnnnnnnn.. then output -> nnnnnnnnnn..
         }
     }
 
