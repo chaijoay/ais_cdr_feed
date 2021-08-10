@@ -230,6 +230,7 @@
 **  12.10   30-Aug-2016     For ERM-FRM v12.1
 **  14.0    05-Feb-2020     For ERM-FRM v14.0
 **  14.0.1  27-Oct-2020     Fix reject CDR(VAS, IDD, Maritime) of other than RBM when, RBM is enabled
+**  14.0.2  26-Nov-2020     Revised Categories
 **++
 */
 
@@ -3337,6 +3338,9 @@ int CommonVoice_To_Voice_Event (char *szCdrType, VOICE_RECORD *pVoiceCdrBuf, int
     memset(szTmp, 0x00, sizeof(szTmp));
     memset(szDetParams, 0x00, sizeof(szDetParams));
 
+    /* CDR Categories */
+    iCategories |= CAT_TOTAL|CAT_VOICE|CAT_LOCAL;   /* Set to init Categories (then later some of them may be removed) */
+
     /* initialize Common Structure buffer for each CDR */
     memset(&com_buf, 0x00, sizeof(com_buf));
     memset(&voice_event, 0x00, sizeof(voice_event));
@@ -3503,14 +3507,7 @@ printf ("%s ano=%-30s => %s\n", szCdrType, pVoiceCdrBuf->a_no, voice_event.mobil
     //strncpy(voice_event.to_number, com_buf.b_no, 18);
     strcpy(voice_event.to_number, com_buf.b_no);
     Conv_RealBno(voice_event.to_number, voice_event.bno);
-#if 0
-    // Added the following onnet/offnet by N.Thanakorn on 26-Aug-2014
-    if ( strncmp(voice_event.to_number, "06", 2) == 0 ||
-         strncmp(voice_event.to_number, "08", 2) == 0 ||
-         strncmp(voice_event.to_number, "09", 2) == 0 ) {
-        iCategories |= CAT_ONNET;
-    }
-#endif
+
 #ifdef DEBUG_BNO    /* Use this for debug only */
 printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_number);
 #endif
@@ -3657,7 +3654,6 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
         }
     }
     else if ( !cIsIodc && *voice_event.to_number == '0' ) {
-        iCategories |= CAT_LOCAL;
         /* Area Code Called (within Thailand) */
         switch ( Parse_Area (voice_event.to_number, voice_event.area_code) ) {
             case SUCCESS :
@@ -3777,8 +3773,6 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
         strcpy(voice_event.remarks, "Roam TOT");
     }
 
-    /* CDR Categories */
-    iCategories |= CAT_TOTAL|CAT_VOICE; /* Set to Total Category and Voice Category */
     if ( strncmp(pVoiceCdrBuf->msc_id, "6692301050", 10) == 0 ) {
         iCategories |= CAT_MARITIME;    // Added by N.Thanakorn on 26-Jun-2014; Maritime.
         strcpy(voice_event.cell_area, DEF_CELL_AREA);
@@ -3820,21 +3814,13 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
               !strncmp(voice_event.to_number, TOTVOIPACC_CODE, TOTVOIPACC_LEN) ||   /* 008 - TOT VOIP Intl' Calls */
               !strncmp(voice_event.to_number, TOTMALAYACC_CODE, TOTMALAYACC_LEN) )  /* 002 - TOT VOIP Malay Intl' Calls*/
         iCategories |= CAT_IDD; /* category - TOT Intl' Calls */
-    else if ( iCategories & CAT_IDD )
-        ;   /* Do Nothing */
-    else if ( iCategories & CAT_IDD )
-        ;   /* Do Nothing */
-#if 0
-    if ( strcmp(pVoiceCdrBuf->data_vol_ref, "OCSVPN") ) {
-        iCategories |= CAT_OUTGOING;    /* category - Outgoing Call, All Call is Outgoing call */
+
+    if ( iCategories & CAT_IDD ) {
+        iCategories &= ~CAT_LOCAL;
     }
-    else {
-        iCategories |= CAT_INCOMING;
-    }
-#endif
 
     if ( glb_UseRatedCdr == 1 ) {
-        if ( (iCategories & CAT_VOICE || iCategories & CAT_VAS) && iCategories & CAT_LOCAL ) {
+        if ( (iCategories & CAT_VOICE || iCategories & CAT_VAS || iCategories & CAT_PREMIUM) && iCategories & CAT_LOCAL ) {
             fprintf(glb_Errfp, "[DET] %s|Rating|Use_RBM|\n", glb_Eindex);
             glb_ErrCtr++;
             return FAILURE; // if RBM cdr is used, only voice local or voice vas from other cdr type is rejected.
@@ -4000,17 +3986,6 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
             return FAILURE;
         }
 
-        /* removed the following block by N.Thanakorn on 26-Aug-2014
-        if ( !strncmp(costcode_name, "AIS", 3) || !(strncmp(costcode_name, "AWN", 3))
-            iCategories |= CAT_ONNET;   // category - Call to AIS/AWN Network
-        else
-            iCategories |= CAT_OFFNET;  // category - Call to Other Network
-        */
-#if 0
-        if ( !(iCategories & CAT_ONNET) ) { /* if CAT_ONNET is not earlier assigned, set to OFFNET. Added by N.Thanakorn on 26-Aug-2014 */
-            iCategories |= CAT_OFFNET;
-        }
-#endif
         /* Introduced Oper Field in HPERM - Added below by Kawee on 18-Sep-2008 */
         if ( strcmp(voice_event.area_code, "") ) { /* Area Code not Blank */
             strcpy(voice_event.oper_name,"FIX");
@@ -4341,14 +4316,7 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
     }
     /* Added below - by Kawee on 19-Apr-2007 */
     else if ( voice_event.to_number[0] == '1' && strlen(voice_event.to_number) < SIZE_PHONENO-2 ) { /* Special Number */
-        /* removed the following block by N.Thanakorn on 26-Aug-2014
-        iCategories |= CAT_OFFNET;  // category - Call to Other Network
-        */
-#if 0
-        if ( !(iCategories & CAT_ONNET) ) { /* if CAT_ONNET is not earlier assigned, set to OFFNET. Added by N.Thanakorn on 26-Aug-2014 */
-            iCategories |= CAT_OFFNET;
-        }
-#endif
+
         strncpy(costcode, voice_event.to_number, 6);        /* Special Number 1xxx */
 
         if ( Lookup_Costcode(banding_model_id, costcode, costgroup_id1, cost_band_id, costcode_name) ) {    /* FAILURE */
@@ -4569,12 +4537,6 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
                         }
                         // pVoiceCdrBuf->cell_id_a;    // CALLED_LAC
                     }
-#if 0
-                    iCategories |= CAT_INCOMING;
-                    if ( iCategories & CAT_OUTGOING ) {
-                        iCategories &= ~CAT_OUTGOING;
-                    }
-#endif
                 }
             }
             else if ( strcmp(voice_event.cell_set, "62025") == 0 ) {    // AISNetCall, added by N.Thanakorn on 9-Nov-2015
@@ -4599,38 +4561,27 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
             }
         }
 
-    if ( voice_event.cell_area[0] == '\0' ) {
-        if ( Get_GeoData(pVoiceCdrBuf->cell_id_a, voice_event.cell, voice_event.cell_set, voice_event.cell_area) != SUCCESS ) {
-            fprintf(glb_Errfp, "[DET] %s|GeoMapp|Cell_IDA| cell_id_a(%s) but not skip\n", glb_Eindex, pVoiceCdrBuf->cell_id_a);
-            strcpy(voice_event.cell_area, UNK_CELL_AREA);
+        if ( voice_event.cell_area[0] == '\0' ) {
+            if ( Get_GeoData(pVoiceCdrBuf->cell_id_a, voice_event.cell, voice_event.cell_set, voice_event.cell_area) != SUCCESS ) {
+                fprintf(glb_Errfp, "[DET] %s|GeoMapp|Cell_IDA| cell_id_a(%s) but not skip\n", glb_Eindex, pVoiceCdrBuf->cell_id_a);
+                strcpy(voice_event.cell_area, UNK_CELL_AREA);
+            }
         }
-    }
 
-    memset(costcode_name, 0x00, sizeof(costcode_name));
-    /* check if costgroup_id1 exist, otherwise cost_band_id will be used as mapping field for rating  */
-    if ( Lookup_Costcode(banding_model_id, szMap_Cell_Idb, costgroup_id1, cost_band_id, costcode_name) ) {  /* FAILURE */
-        fputs(szRawCdr, glb_RCdrfp);    /* reject the record */
-        fprintf(glb_Errfp, "[DET] %s|Rating|Cell_IDB| costcode(%s)\n", glb_Eindex, szMap_Cell_Idb);
-        glb_ErrCtr++;
-        return FAILURE;
-    }
-    if ( !strncmp(costcode_name, "AIS", 3) || !strncmp(costcode_name, "AWN", 3) ) {
-        /* removed the following block by N.Thanakorn on 26-Aug-2014
-        iCategories |= CAT_ONNET;   // category - Call to AIS/AWN Network
-        */
-        strcpy(szChargeNet, costcode_name);
-    }
-    else {
-        /* removed the following block by N.Thanakorn on 26-Aug-2014
-        iCategories |= CAT_OFFNET;  // category - Call to Other Network
-        */
-        strcpy(szChargeNet, "OTH");
-    }
-#if 0
-        if ( !(iCategories & CAT_ONNET) ) { /* if CAT_ONNET is not earlier assigned, set to OFFNET. Added by N.Thanakorn on 26-Aug-2014 */
-            iCategories |= CAT_OFFNET;
+        memset(costcode_name, 0x00, sizeof(costcode_name));
+        /* check if costgroup_id1 exist, otherwise cost_band_id will be used as mapping field for rating  */
+        if ( Lookup_Costcode(banding_model_id, szMap_Cell_Idb, costgroup_id1, cost_band_id, costcode_name) ) {  /* FAILURE */
+            fputs(szRawCdr, glb_RCdrfp);    /* reject the record */
+            fprintf(glb_Errfp, "[DET] %s|Rating|Cell_IDB| costcode(%s)\n", glb_Eindex, szMap_Cell_Idb);
+            glb_ErrCtr++;
+            return FAILURE;
         }
-#endif
+        if ( !strncmp(costcode_name, "AIS", 3) || !strncmp(costcode_name, "AWN", 3) ) {
+            strcpy(szChargeNet, costcode_name);
+        }
+        else {
+            strcpy(szChargeNet, "OTH");
+        }
 
         /* Introduced Oper Field in HPERM - Added below by Kawee on 18-Sep-2008 */
         if ( strcmp(voice_event.area_code, "") ) { /* Area Code not Blank */
@@ -4739,18 +4690,9 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
 
     sprintf(voice_event.charge, "%010.0lf", Charge);
     sprintf(voice_event.fee_charge, "%010.0lf", 0.0);    // Added by N.Thanakorn on 08-Oct-2014, Maritime;
-    //if ( iCategories & CAT_ONNET || iCategories & CAT_OFFNET ) {    // Add by Thanakon on 09-May-2014
-        if ( !(iCategories & CAT_PREMIUM) && !(iCategories & CAT_VAS) && !(iCategories & CAT_IDD) ) {
-            iCategories &= ~CAT_TOTAL;  // remove CAT_TOTAL out, so that on-net/off-net will not sum to Total dimension.
-        }
-    //}
-    if ( iCategories & CAT_TOTAL ) {
-        iCategories &= ~CAT_TOTAL;      // remove CAT_TOTAL out, so that maritime will not sum to Total dimension.
-    }
+
     if ( iCategories & CAT_MARITIME ) {
-        iCategories &= ~CAT_LOCAL;      // remove CAT_LOCAL out, so that maritime will not sum to Voice Local dimension.
-        //iCategories &= ~CAT_ONNET;
-        //iCategories &= ~CAT_OFFNET;
+        iCategories &= ~CAT_TOTAL;
         iCategories &= ~CAT_VAS;
         iCategories &= ~CAT_PREMIUM;
         if ( iCategories & CAT_IDD ) {  // Added by N.Thanakorn on 08-Oct-2014, Maritime;
@@ -4758,14 +4700,13 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
             sprintf(voice_event.fee_charge, "%010d", (25*100));
         }
     }
-    if ( iCategories & CAT_VAS ) {
-        iCategories |= CAT_TOTAL;
-    }
+
     sprintf(voice_event.categories, "%08d", iCategories);
     strcpy(voice_event.original_bno, glb_OriginalBno);
     strcpy(voice_event.event_src, glb_EventSource);
 
     if ( iCategories & CAT_IDD ) {  // Added by Thanakorn
+        iCategories &= ~CAT_LOCAL;
         glb_EventId = VOICE_EVENT_TYPE_IDD; // Actually it's voice event but just for categorize Priority Tube by IUM)
     }
 
@@ -9923,6 +9864,8 @@ printf ("\t Bno=%-30s => %s\n", pbuf_ims[IMS_BNO], voice_event.to_number);
     cIsIodc = Is_IodcNumber(voice_event.to_number); /* Introduced IODC Mapping Table */
     strcpy(voice_event.country_code, "66");                             /* default for Thailand */
 
+    iCategories = CAT_VOICE|CAT_TOTAL;
+
     if ( (!strncmp(voice_event.to_number, IDDACC_CODE, IDDACC_LEN) ||
          !strncmp(voice_event.to_number, EPHACC_CODE, EPHACC_LEN)) &&   /* CAT Intl' Call */
          !cIsIodc ) {                                                   /* But not Operator Assisted Call */
@@ -10524,8 +10467,6 @@ printf ("\t Bno=%-30s => %s\n", pbuf_ims[IMS_BNO], voice_event.to_number);
     else
         iFeature = FEAT_PREPAID_CALL;
 
-    iCategories |= CAT_VOICE;
-
     sprintf(voice_event.fee_charge, "%010.0lf", 0.0f);
     if ( iCategories & CAT_MARITIME ) {
         iCategories &= ~CAT_LOCAL;      // remove CAT_LOCAL out, so that maritime will not sum to Voice Local dimension.
@@ -10540,15 +10481,11 @@ printf ("\t Bno=%-30s => %s\n", pbuf_ims[IMS_BNO], voice_event.to_number);
     }
 
     if ( glb_UseRatedCdr == 1 ) {
-        if ( (iCategories & CAT_VOICE || iCategories & CAT_VAS) && iCategories & CAT_LOCAL ) {
+        if ( (iCategories & CAT_VOICE || iCategories & CAT_VAS || iCategories & CAT_PREMIUM) && iCategories & CAT_LOCAL ) {
             fprintf(glb_Errfp, "[DET] %s|Rating|Use_RBM|\n", glb_Eindex);
             glb_ErrCtr++;
             return FAILURE; // if RBM cdr is used, only voice local or voice vas from other cdr type is rejected.
         }
-    }
-
-    if ( iCategories & CAT_VAS ) {
-        iCategories |= CAT_TOTAL;
     }
 
     sprintf(voice_event.charge, "%010.0lf", Charge);
@@ -11383,7 +11320,7 @@ printf ("\t Bno=%-30s => %s\n", pbuf_rdc[RDC_CALLED_B_NO], voice_event.to_number
     }
 
     if ( glb_UseRatedCdr == 1 ) {
-        if ( (iCategories & CAT_VOICE || iCategories & CAT_VAS) && iCategories & CAT_LOCAL ) {
+        if ( (iCategories & CAT_VOICE || iCategories & CAT_VAS || iCategories & CAT_PREMIUM) && iCategories & CAT_LOCAL ) {
             fprintf(glb_Errfp, "[DET] %s|Rating|Use_RBM|\n", glb_Eindex);
             glb_ErrCtr++;
             return FAILURE; // if RBM cdr is used, only voice local or voice vas from other cdr type is rejected.
@@ -11721,6 +11658,8 @@ int Rbm_To_Voice_Event()
     memset(&voice_event, 0x00, sizeof(voice_event));
     memset(szDetParams, 0x00, sizeof(szDetParams));
 
+    iCategories = CAT_LOCAL;
+
 /* -------------------------------------------- */
 /* ----- Validation --------------------------- */
 /* -------------------------------------------- */
@@ -11843,7 +11782,7 @@ int Rbm_To_Voice_Event()
     }
     else if ( !cIsIodc && *voice_event.to_number == '0' ) {
 
-        iCategories |= CAT_LOCAL;
+        //iCategories |= CAT_LOCAL;
         /* Area Code Called (within Thailand) */
         switch ( Parse_Area(voice_event.to_number, voice_event.area_code) ) {
             case SUCCESS :
@@ -11868,7 +11807,7 @@ int Rbm_To_Voice_Event()
     else if ( !strncmp(voice_event.to_number, "900", 3) ||      /* IVR Service */
               !strncmp(voice_event.to_number, "*", 1) ||        /* IVR Service */
               !strncmp(voice_event.to_number, "B", 1) ) {       /* IVR Service */
-        iCategories |= CAT_VAS|CAT_LOCAL;
+        iCategories |= CAT_VAS; //|CAT_LOCAL;
     }
 
     if ( strlen(pbuf_rbm[RBM_PROV_NAME]) ) {
@@ -11954,7 +11893,7 @@ int Rbm_To_Voice_Event()
 
     sprintf(voice_event.fee_charge, "%010.0lf", 0.0f);
     if ( iCategories & CAT_MARITIME ) {
-        iCategories &= ~CAT_LOCAL;      // remove CAT_LOCAL out, so that maritime will not sum to Voice Local dimension.
+        //iCategories &= ~CAT_LOCAL;      // remove CAT_LOCAL out, so that maritime will not sum to Voice Local dimension.
         //iCategories &= ~CAT_ONNET;
         //iCategories &= ~CAT_OFFNET;
         iCategories &= ~CAT_VAS;
@@ -11969,10 +11908,6 @@ int Rbm_To_Voice_Event()
         sprintf(voice_event.fee_charge, "%010.0lf", atof(pbuf_rbm[RBM_PREDISC_COST]) / 10.0);
     }
 
-    if ( iCategories & CAT_VAS ) {
-        iCategories |= CAT_TOTAL;
-    }
-
     sprintf(voice_event.charge, "%010.0lf", Charge);
     sprintf(voice_event.features, "%010d", iFeature);
     strcpy(voice_event.detect_params, szDetParams);
@@ -11982,11 +11917,13 @@ int Rbm_To_Voice_Event()
     strcpy(voice_event.remarks, pbuf_rbm[RBM_COSTBAND_NAME]);
 
     if ( iCategories & CAT_IDD ) {  // Added by Thanakorn
+        iCategories &= ~CAT_LOCAL;          // remove CAT_LOCAL out
         glb_EventId = VOICE_EVENT_TYPE_IDD; // Actually it's voice event but just for categorize Priority Tube by IUM)
     }
 
     return SUCCESS;
 }
+
 
 int Init_MapdStat()
 {
