@@ -7440,8 +7440,18 @@ int Cdg_To_Dcb_Event ()
     *cdg_event.bearer_code = *bearer_code;
 
     /* CDR Categories */
-    iCategories |= CAT_TOTAL|CAT_APP_PURCHASE|CAT_LOCAL;   /* Set to Total, VAS and Outgoing Category */
+    if ( glb_MtxInd == DCBCT_TYPE ) {   // DCB as a ctudr cdr file
+        iCategories |= CAT_TOTAL|CAT_VAS|CAT_LOCAL;
+        Get_VasGroupCodeByGrpName(pbuf_cdg[CDG_MKTYPE], cdg_event.vas_grp);
+    }
+    else {
+        iCategories |= CAT_TOTAL|CAT_APP_PURCHASE|CAT_LOCAL;
+        strcpy(cdg_event.vas_grp, "8");     // google play;
+    }
     sprintf(cdg_event.categories, "%08d", iCategories);
+
+    // Directrion
+    strcpy(cdg_event.direction, OUTGOING);   // Outgoing
 
     /* Detection Skip Parameters */
     strcat(szDetParams, gaszFrmSkipDet[SKIP_COLLISION]);        /* Always skip collision check for cdg */
@@ -7466,7 +7476,6 @@ int Cdg_To_Dcb_Event ()
     }
     sprintf(cdg_event.charge,   "%010ld", lCharge);
     sprintf(cdg_event.pre_disc, "%010ld", lPreDisc);
-    strcpy(cdg_event.vas_grp, "8");     // google play;
 
     return (CommonVas_To_Vas_Event(glb_MtxInd, (void *)&cdg_event));
 
@@ -20045,8 +20054,11 @@ int Get_VasGroupCodeByGrpName(char *grp_name, char *grp_code)
     if ( Get_VasGroupCode(code_type, grp_name, grp_code) == FAILED ) {
         strcpy(code_type, "Costcode_Name");
         if ( Get_VasGroupCode(code_type, grp_name, grp_code) == FAILED ) {
-            strcpy(grp_code, "0");
-            return FAILURE;
+            strcpy(code_type, "MKTType");
+            if ( Get_VasGroupCode(code_type, grp_name, grp_code) == FAILED ) {
+                strcpy(grp_code, "0");
+                return FAILURE;
+            }
         }
     }
     return SUCCESS;
