@@ -196,6 +196,7 @@
 **  12.10   30-Aug-2016     For ERM-FRM v12.1
 **  12.11   18-May-2017     Revise log message for audit purpose
 **  14.0    05-Feb-2020     For ERM-FRM v14.0
+**  14.0.3  19-Aug-2021     Fixed on excluding IMS/GSM cdr(voice,vas,premium) out of FRM when RBM cdr is used.
 **++
 **++
 */

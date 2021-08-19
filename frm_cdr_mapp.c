@@ -231,6 +231,7 @@
 **  14.0    05-Feb-2020     For ERM-FRM v14.0
 **  14.0.1  27-Oct-2020     Fix reject CDR(VAS, IDD, Maritime) of other than RBM when, RBM is enabled
 **  14.0.2  26-Nov-2020     Revised Categories
+**  14.0.3  19-Aug-2021     Fixed on excluding IMS/GSM cdr(voice,vas,premium) out of FRM when RBM cdr is used.
 **++
 */
 
@@ -3792,7 +3793,11 @@ printf ("%s bno=%-30s => %s\n", szCdrType, pVoiceCdrBuf->b_no, voice_event.to_nu
          !strncmp(voice_event.to_number, "*909", 4) ) {     /* Added *909 as Premium call by Wiraphot on 17-April-2009 */
         /* Added "VasOrPremium" Category - Changed as below by Kawee on 22-Mar-2007 */
         /* iCategories |= CAT_PREMIUM; */   /* category - Premium Calls */
-        iCategories |= CAT_PREMIUM;           /* category - Premium Calls */
+        if ( iCategories & CAT_IDD ) {
+            iCategories |= CAT_PREMIUM;
+        } else {
+            iCategories |= CAT_PREMIUM|CAT_LOCAL;
+        }           /* category - Premium Calls */
     }
     /*
     ** Since, AIS have been implement Audio Text Service on *xxx,Bxxx,900xxx Number and Take care these service as VAS.
@@ -9926,7 +9931,12 @@ printf ("\t Bno=%-30s => %s\n", pbuf_ims[IMS_BNO], voice_event.to_number);
          !strncmp(voice_event.to_number, "900909", 6) ||
          !strncmp(voice_event.to_number, "B909", 4) ||
          !strncmp(voice_event.to_number, "*909", 4) ) {
-        iCategories |= CAT_PREMIUM;
+        if ( iCategories & CAT_IDD ) {
+            iCategories |= CAT_PREMIUM;
+        } else {
+            iCategories |= CAT_PREMIUM|CAT_LOCAL;
+        }
+        
     }
     else if ( !strncmp(voice_event.to_number, "900", 3) ||      /* IVR Service */
               !strncmp(voice_event.to_number, "*", 1) ||        /* IVR Service */
@@ -10857,7 +10867,11 @@ printf ("\t Bno=%-30s => %s\n", pbuf_rdc[RDC_CALLED_B_NO], voice_event.to_number
          !strncmp(voice_event.to_number, "900909", 6) ||
          !strncmp(voice_event.to_number, "B909", 4) ||
          !strncmp(voice_event.to_number, "*909", 4) ) {
-        iCategories |= CAT_PREMIUM;
+        if ( iCategories & CAT_IDD ) {
+            iCategories |= CAT_PREMIUM;
+        } else {
+            iCategories |= CAT_PREMIUM|CAT_LOCAL;
+        }
     }
     else if ( !strncmp(voice_event.to_number, "900", 3) ||      /* IVR Service */
               !strncmp(voice_event.to_number, "*", 1) ||        /* IVR Service */
@@ -11802,7 +11816,11 @@ int Rbm_To_Voice_Event()
          !strncmp(voice_event.to_number, "900909", 6) ||
          !strncmp(voice_event.to_number, "B909", 4) ||
          !strncmp(voice_event.to_number, "*909", 4) ) {
-        iCategories |= CAT_PREMIUM;
+        if ( iCategories & CAT_IDD ) {
+            iCategories |= CAT_PREMIUM;
+        } else {
+            iCategories |= CAT_PREMIUM|CAT_LOCAL;
+        }
     }
     else if ( !strncmp(voice_event.to_number, "900", 3) ||      /* IVR Service */
               !strncmp(voice_event.to_number, "*", 1) ||        /* IVR Service */

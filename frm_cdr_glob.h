@@ -180,6 +180,7 @@
 //  11.01   09-Sep-2012     Revise code to support upgrade to fms v11 - by Thanakorn
 //  12.10   30-Aug-2016     For ERM-FRM v12.1
 //  14.0    05-Feb-2020     For ERM-FRM v14.0
+//  14.0.3  19-Aug-2021     Fixed on excluding IMS/GSM cdr(voice,vas,premium) out of FRM when RBM cdr is used.
 //
 //
 //
